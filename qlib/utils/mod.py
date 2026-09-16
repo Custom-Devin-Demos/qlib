@@ -9,25 +9,92 @@ All module related class, e.g. :
 
 import contextlib
 import importlib
+import importlib.util
 import os
 from pathlib import Path
 import pkgutil
 import re
 import sys
 from types import ModuleType
-from typing import Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Set, Tuple, Union
 from urllib.parse import urlparse
 
 from qlib.typehint import InstConf
 from qlib.utils.pickle_utils import restricted_pickle_load
 
+# Module prefixes that config-driven instantiation (``init_instance_by_config``) is allowed to import.
+# Extend with ``add_trusted_module_prefix`` or the ``QLIB_TRUSTED_MODULE_PREFIXES`` env var (comma separated).
+TRUSTED_MODULE_PREFIXES: Set[str] = {
+    "qlib",
+    "lightgbm",
+    "xgboost",
+    "catboost",
+    "sklearn",
+    "torch",
+}
+TRUSTED_MODULE_PREFIXES.update(
+    p.strip() for p in os.environ.get("QLIB_TRUSTED_MODULE_PREFIXES", "").split(",") if p.strip()
+)
+
+# Directories from which ``.py`` files may be loaded as modules by config.
+# Extend with ``add_trusted_module_dir`` or the ``QLIB_TRUSTED_MODULE_DIRS`` env var (os.pathsep separated).
+TRUSTED_MODULE_DIRS: Set[Path] = set()
+TRUSTED_MODULE_DIRS.update(
+    Path(p).resolve() for p in os.environ.get("QLIB_TRUSTED_MODULE_DIRS", "").split(os.pathsep) if p.strip()
+)
+
+
+class UntrustedModuleError(ImportError):
+    """Raised when a config references a module that is not in the trusted allowlist."""
+
+
+def add_trusted_module_prefix(*prefixes: str) -> None:
+    """Allow modules whose name equals or starts with ``<prefix>.`` to be loaded from configs."""
+    TRUSTED_MODULE_PREFIXES.update(p.strip() for p in prefixes if p and p.strip())
+
+
+def add_trusted_module_dir(*dirs: Union[str, Path]) -> None:
+    """Allow ``.py`` files located under ``dirs`` to be loaded as modules from configs."""
+    TRUSTED_MODULE_DIRS.update(Path(d).resolve() for d in dirs)
+
+
+def is_trusted_module_file(module_file: Union[str, Path]) -> bool:
+    resolved = Path(module_file).resolve()
+    for d in TRUSTED_MODULE_DIRS:
+        try:
+            resolved.relative_to(d)
+            return True
+        except ValueError:
+            continue
+    return False
+
+
+def is_trusted_module_name(module_name: str) -> bool:
+    if any(module_name == p or module_name.startswith(p + ".") for p in TRUSTED_MODULE_PREFIXES):
+        return True
+    # modules whose source lives under a trusted directory (e.g. added via qrun's `sys.path`) are trusted too
+    top_level = module_name.split(".")[0]
+    try:
+        spec = importlib.util.find_spec(top_level)
+    except (ImportError, ValueError):
+        return False
+    if spec is None:
+        return False
+    locations = list(spec.submodule_search_locations or [])
+    if spec.origin and spec.origin not in ("built-in", "frozen"):
+        locations.append(spec.origin)
+    return any(is_trusted_module_file(loc) for loc in locations)
+
 
 def get_module_by_module_path(module_path: Union[str, ModuleType]):
     """Load module path
 
+    Only modules whose name matches ``TRUSTED_MODULE_PREFIXES`` may be imported by name,
+    and only ``.py`` files located under ``TRUSTED_MODULE_DIRS`` may be executed from disk.
+
     :param module_path:
     :return:
-    :raises: ModuleNotFoundError
+    :raises: ModuleNotFoundError, UntrustedModuleError
     """
     if module_path is None:
         raise ModuleNotFoundError("None is passed in as parameters as module_path")
@@ -36,12 +103,24 @@ def get_module_by_module_path(module_path: Union[str, ModuleType]):
         module = module_path
     else:
         if module_path.endswith(".py"):
+            if not is_trusted_module_file(module_path):
+                raise UntrustedModuleError(
+                    f"Refusing to execute module file '{module_path}': it is not under a trusted directory. "
+                    "Register the directory with qlib.utils.mod.add_trusted_module_dir() "
+                    "or the QLIB_TRUSTED_MODULE_DIRS environment variable."
+                )
             module_name = re.sub("^[^a-zA-Z_]+", "", re.sub("[^0-9a-zA-Z_]", "", module_path[:-3].replace("/", "_")))
             module_spec = importlib.util.spec_from_file_location(module_name, module_path)
             module = importlib.util.module_from_spec(module_spec)
             sys.modules[module_name] = module
             module_spec.loader.exec_module(module)
         else:
+            if not is_trusted_module_name(module_path):
+                raise UntrustedModuleError(
+                    f"Refusing to import module '{module_path}': it is not in the trusted module allowlist. "
+                    "Register it with qlib.utils.mod.add_trusted_module_prefix() "
+                    "or the QLIB_TRUSTED_MODULE_PREFIXES environment variable."
+                )
             module = importlib.import_module(module_path)
     return module
 
@@ -62,6 +141,12 @@ def split_module_path(module_path: str) -> Tuple[str, str]:
     *m_path, cls = module_path.split(".")
     m_path = ".".join(m_path)
     return m_path, cls
+
+
+def _get_public_attr(module: ModuleType, name: str):
+    if name.startswith("_"):
+        raise AttributeError(f"Refusing to load private/dunder attribute '{name}' from module '{module.__name__}'")
+    return getattr(module, name)
 
 
 def get_callable_kwargs(config: InstConf, default_module: Union[str, ModuleType] = None) -> (type, dict):
@@ -100,7 +185,7 @@ def get_callable_kwargs(config: InstConf, default_module: Union[str, ModuleType]
             module = get_module_by_module_path(m_path)
 
             # 2) get callable
-            _callable = getattr(module, cls)  # may raise AttributeError
+            _callable = _get_public_attr(module, cls)  # may raise AttributeError
         else:
             _callable = config[key]  # the class type itself is passed in
         kwargs = config.get("kwargs", {})
@@ -109,7 +194,7 @@ def get_callable_kwargs(config: InstConf, default_module: Union[str, ModuleType]
         m_path, cls = split_module_path(config)
         module = get_module_by_module_path(default_module if m_path == "" else m_path)
 
-        _callable = getattr(module, cls)
+        _callable = _get_public_attr(module, cls)
         kwargs = {}
     else:
         raise NotImplementedError(f"This type of input is not supported")
