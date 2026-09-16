@@ -6,7 +6,7 @@ from qlib.contrib.data.loader import Alpha158DL, Alpha360DL
 from qlib.stream import FeatureBuffer, Tick
 from qlib.stream.buffer import compile_expression, parse_buffer_field
 
-from _synthetic import INSTRUMENTS, N_BARS, frame_to_ticks
+from ._synthetic import INSTRUMENTS, N_BARS, frame_to_ticks
 
 
 def reference_features(fields, names, ohlcv: pd.DataFrame) -> pd.DataFrame:
