@@ -126,3 +126,16 @@ def ticks(dates, instruments):
 def doubles():
     buffer = FakeBuffer()
     return buffer, FakeDataset(buffer), FakeModel()
+
+
+from ._synthetic import frame_to_ticks, make_ohlcv
+
+
+@pytest.fixture(scope="session")
+def ohlcv():
+    return make_ohlcv()
+
+
+@pytest.fixture(scope="session")
+def ohlcv_ticks(ohlcv):
+    return frame_to_ticks(ohlcv)
