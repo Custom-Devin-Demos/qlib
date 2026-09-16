@@ -55,6 +55,11 @@ SAFE_PICKLE_CLASSES: Set[Tuple[str, str]] = {
 TRUSTED_MODULE_PREFIXES = (
     "pandas",
     "numpy",
+    # qlib objects (models, datasets, handlers, task configs) persisted via Recorder.save_objects
+    "qlib",
+    # model libraries whose fitted estimators qlib persists as MLflow artifacts
+    "lightgbm",
+    "torch",
 )
 
 
@@ -82,7 +87,7 @@ class RestrictedUnpickler(pickle.Unpickler):
         Raises:
             pickle.UnpicklingError: If the class is not in the whitelist
         """
-        if module.startswith(TRUSTED_MODULE_PREFIXES):
+        if any(module == prefix or module.startswith(prefix + ".") for prefix in TRUSTED_MODULE_PREFIXES):
             return super().find_class(module, name)
 
         # 2. explicit whitelist (qlib internal)
