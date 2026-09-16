@@ -6,7 +6,6 @@ import sys
 from typing import Optional
 import mlflow
 import shutil
-import pickle
 import tempfile
 import subprocess
 import platform
@@ -16,6 +15,7 @@ from datetime import datetime
 from qlib.utils.serial import Serializable
 from qlib.utils.exceptions import LoadObjectError
 from qlib.utils.paral import AsyncCaller
+from qlib.utils.pickle_utils import RestrictedUnpickler
 
 from ..log import TimeInspector, get_module_logger
 from mlflow.store.artifact.azure_blob_artifact_repo import AzureBlobArtifactRepository
@@ -410,9 +410,12 @@ class MLflowRecorder(Recorder):
                 self.client.log_artifact(self.id, temp_dir / name, artifact_path)
             shutil.rmtree(temp_dir)
 
-    def load_object(self, name, unpickler=pickle.Unpickler):
+    def load_object(self, name, unpickler=RestrictedUnpickler):
         """
         Load object such as prediction file or model checkpoint in mlflow.
+
+        Artifacts may come from a remote or shared tracking server, so they are treated as
+        untrusted and deserialized with a restricted unpickler by default.
 
         Args:
             name (str): the object name
