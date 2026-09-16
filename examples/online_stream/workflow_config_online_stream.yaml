@@ -1,0 +1,88 @@
+# Streaming online inference: offline training task + live-signal online strategy.
+#
+# The `task` block is the standard qrun task layout (model + Alpha158 handler). `train_offline.py` trains the same
+# model on features produced by `qlib.stream.buffer.FeatureBuffer` (no on-disk provider), so this file mainly
+# documents the configuration; run it with `qrun` only when a real provider is available.
+qlib_init:
+    # No on-disk provider is required for the streaming path; keep the default so `qlib.init()` works offline.
+    provider_uri: "~/.qlib/qlib_data/cn_data"
+    region: cn
+
+market: &market ["SH600000", "SH600016", "SH600519", "SZ000001", "SZ000858"]
+
+stream:
+    source:
+        class: ReplayCSVSource
+        module_path: qlib.stream.sources
+        kwargs:
+            path: examples/online_stream/sample_ticks.csv
+            speed: 0.2          # 0 = as fast as possible, 1 = real time
+            loop: false
+    buffer:
+        class: FeatureBuffer
+        module_path: qlib.stream.buffer
+        handler_cls: Alpha158   # FeatureBuffer.from_handler_config("Alpha158", window=61)
+        window: 61
+    server:
+        class: OnlineInferenceServer
+        module_path: qlib.stream.server
+        experiment_name: online_stream
+        recorder_id: <RECORDER_ID>   # printed by train_offline.py
+        host: 0.0.0.0
+        port: 8000
+
+online:
+    strategies:
+        - class: StreamOnlineStrategy
+          module_path: qlib.workflow.online.stream
+          kwargs:
+              name_id: live_stream
+              # signal_provider: a StreamSignalSink fed by OnlineInferenceServer(signal_sink=...) or by polling
+              # GET /signals/latest (see consume_signals.py)
+    manager:
+        class: OnlineManager
+        module_path: qlib.workflow.online.manager
+        kwargs:
+            begin_time: 2020-01-01
+
+port_analysis_config: &port_analysis_config
+    strategy:
+        class: TopkDropoutStrategy
+        module_path: qlib.contrib.strategy
+        kwargs:
+            signal: <PRED>      # OnlineManager.get_signals()
+            topk: 2
+            n_drop: 1
+
+task:
+    model:
+        class: LGBModel
+        module_path: qlib.contrib.model.gbdt
+        kwargs:
+            loss: mse
+            learning_rate: 0.1
+            num_leaves: 7
+            min_data_in_leaf: 5
+            early_stopping_rounds: 10
+            num_boost_round: 30
+    dataset:
+        class: DatasetH
+        module_path: qlib.data.dataset
+        kwargs:
+            handler:
+                class: Alpha158
+                module_path: qlib.contrib.data.handler
+                kwargs:
+                    start_time: 2020-01-01
+                    end_time: 2020-07-31
+                    fit_start_time: 2020-01-01
+                    fit_end_time: 2020-05-31
+                    instruments: *market
+                    label: ["Ref($close, -2) / Ref($close, -1) - 1"]
+            segments:
+                train: [2020-01-01, 2020-05-31]
+                valid: [2020-06-01, 2020-06-30]
+                test: [2020-07-01, 2020-07-31]
+    record:
+        - class: SignalRecord
+          module_path: qlib.workflow.record_temp
