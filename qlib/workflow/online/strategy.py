@@ -14,6 +14,7 @@ from qlib.workflow.recorder import Recorder
 from qlib.workflow.task.collect import Collector, RecorderCollector
 from qlib.workflow.task.gen import RollingGen, task_generator
 from qlib.workflow.task.utils import TimeAdjuster
+from qlib.utils.pickle_utils import RestrictedUnpickler
 
 
 class OnlineStrategy:
@@ -134,7 +135,7 @@ class RollingStrategy(OnlineStrategy):
         """
 
         def rec_key(recorder):
-            task_config = recorder.load_object("task")
+            task_config = recorder.load_object("task", unpickler=RestrictedUnpickler)
             model_key = task_config["model"]["class"]
             rolling_key = task_config["dataset"]["kwargs"]["segments"]["test"]
             return model_key, rolling_key
@@ -184,7 +185,7 @@ class RollingStrategy(OnlineStrategy):
         )
         res = []
         for rec in latest_records:
-            task = rec.load_object("task")
+            task = rec.load_object("task", unpickler=RestrictedUnpickler)
             res.extend(self.rg.gen_following_tasks(task, calendar_latest))
         return res
 
@@ -200,9 +201,15 @@ class RollingStrategy(OnlineStrategy):
         """
         if len(rec_list) == 0:
             return rec_list, None
-        max_test = max(rec.load_object("task")["dataset"]["kwargs"]["segments"]["test"] for rec in rec_list)
+        max_test = max(
+            rec.load_object("task", unpickler=RestrictedUnpickler)["dataset"]["kwargs"]["segments"]["test"]
+            for rec in rec_list
+        )
         latest_rec = []
         for rec in rec_list:
-            if rec.load_object("task")["dataset"]["kwargs"]["segments"]["test"] == max_test:
+            if (
+                rec.load_object("task", unpickler=RestrictedUnpickler)["dataset"]["kwargs"]["segments"]["test"]
+                == max_test
+            ):
                 latest_rec.append(rec)
         return latest_rec, max_test
