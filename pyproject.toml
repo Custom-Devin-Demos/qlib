@@ -60,7 +60,9 @@ dependencies = [
 dev = [
   "pytest",
   "statsmodels",
+  "httpx",
 ]
+stream = ["websockets", "fastapi", "uvicorn"]
 # On macos-13 system, when using python version greater than or equal to 3.10,
 # pytorch can't fully support Numpy version above 2.0, so, when you want to install torch,
 # it will limit the version of Numpy less than 2.0.
@@ -118,6 +120,7 @@ license-files = []
 
 [project.scripts]
 qrun = "qlib.cli.run:run"
+qstream = "qlib.cli.stream:run"
 
 [tool.setuptools_scm]
 local_scheme = "no-local-version"
