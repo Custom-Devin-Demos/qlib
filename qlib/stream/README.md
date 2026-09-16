@@ -35,7 +35,7 @@ Modules and the interfaces they MUST expose (other modules import against these 
   - `fields`/`names` are exactly the expression strings and column names returned by
     `qlib.contrib.data.loader.Alpha158DL.get_feature_config()` / `Alpha360DL.get_feature_config()`.
   - `update(tick: Tick) -> None` appends/overwrites the bar for `(tick.datetime, tick.instrument)` and keeps at most
-    `window` bars per instrument (`window` must be >= the deepest lookback used by the expressions, e.g. 60 for Alpha158/Alpha360 default configs).
+    `window` bars per instrument (`window` must be >= the deepest lookback used by the expressions, e.g. 61 for the default Alpha158 config (`Ref($close, 60)`), 60 for Alpha360).
   - `latest_features(instruments=None) -> pd.DataFrame` — index `MultiIndex(datetime, instrument)` (ONE row per
     instrument, the latest bar), columns == `names`, values identical to what the offline
     `DataHandler` would compute for that same bar given the same raw OHLCV history.
@@ -62,8 +62,8 @@ Modules and the interfaces they MUST expose (other modules import against these 
 
 ## `qlib/stream/server.py`
 - `OnlineInferenceServer(model, dataset: StreamDataset, source: StreamSource, buffer: FeatureBuffer, recorder=None, signal_sink=None)`
-  - `from_recorder(recorder_id | Recorder, experiment_name, source, handler_cls="Alpha158", window=60, ...)` loads
-    `model.pkl` (and `dataset` if present, to reuse fitted processors) via `qlib.workflow.R.get_recorder(...).load_object(...)`.
+  - `from_recorder(recorder_id | Recorder, experiment_name, source, handler_cls="Alpha158", window=61, ...)` loads
+    the model artifact (`params.pkl` as written by `task_train`, falling back to `model.pkl`; and `dataset` if present, to reuse fitted processors) via `qlib.workflow.R.get_recorder(...).load_object(...)`.
   - `start()` subscribes to `source`, updates buffer on each tick, re-scores when a bar completes; `stop()`.
   - `latest_signals() -> pd.Series` indexed by `(datetime, instrument)`.
   - `app` property: FastAPI app with

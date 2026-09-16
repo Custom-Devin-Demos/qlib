@@ -201,13 +201,14 @@ class OnlineInferenceServer:
         experiment_name: Optional[str] = None,
         source: Optional[StreamSource] = None,
         handler_cls: str = "Alpha158",
-        window: int = 60,
+        window: int = 61,
         instruments: Optional[List[str]] = None,
         **kwargs,
     ) -> "OnlineInferenceServer":
         """Build a server from a recorded experiment.
 
-        Loads ``model.pkl`` from the recorder. If a ``dataset`` artifact exists its fitted handler's infer
+        Loads the model from the recorder (``params.pkl`` as written by ``qlib.model.trainer.task_train``, falling
+        back to ``model.pkl``). If a ``dataset`` artifact exists its fitted handler's infer
         processors are reused through ``StreamHandler.from_offline_handler``; otherwise a bare
         ``StreamHandler`` (no processors) is used. Never reads the on-disk feature provider.
         """
@@ -220,7 +221,7 @@ class OnlineInferenceServer:
             raise ValueError("`source` is required")
         if isinstance(recorder, str):
             recorder = R.get_recorder(recorder_id=recorder, experiment_name=experiment_name)
-        model = recorder.load_object("model.pkl")
+        model = cls._load_model(recorder)
 
         buffer = FeatureBuffer.from_handler_config(handler_cls, window=window, instruments=instruments)
         offline_handler = None
@@ -235,6 +236,18 @@ class OnlineInferenceServer:
             handler = StreamHandler(buffer)
         dataset = StreamDataset(handler)
         return cls(model, dataset, source, buffer, recorder=recorder, **kwargs)
+
+    MODEL_ARTIFACTS = ("params.pkl", "model.pkl")
+
+    @classmethod
+    def _load_model(cls, recorder: "Recorder"):
+        errors = []
+        for name in cls.MODEL_ARTIFACTS:
+            try:
+                return recorder.load_object(name)
+            except Exception as exc:  # pylint: disable=broad-except
+                errors.append(f"{name}: {exc}")
+        raise FileNotFoundError(f"no model artifact in recorder {recorder.id} ({'; '.join(errors)})")
 
     # ------------------------------------------------------------------ lifecycle
     def start(self) -> None:

@@ -6,7 +6,7 @@
 Example::
 
     python -m qlib.cli.stream serve --recorder_id 1a2b3c --experiment_name workflow \
-        --source csv:examples/online_stream/sample_ticks.csv --handler Alpha158 --window 60 \
+        --source csv:examples/online_stream/sample_ticks.csv --handler Alpha158 --window 61 \
         --host 127.0.0.1 --port 8000
 
 ``--source`` accepts ``csv:/path.csv``, ``jsonl:/path.jsonl`` or ``ws://host/path`` (see
@@ -56,7 +56,7 @@ def serve(
     experiment_name: str,
     source: str,
     handler: str = "Alpha158",
-    window: int = 60,
+    window: int = 61,
     host: str = "127.0.0.1",
     port: int = 8000,
     provider_uri: Optional[str] = None,
@@ -65,12 +65,12 @@ def serve(
     flush_interval: Optional[float] = 1.0,
     speed: Optional[float] = None,
 ):
-    """Load ``model.pkl`` from a recorder and serve ``/health``, ``/signals/latest`` and ``/predict``.
+    """Load the model (``params.pkl`` or ``model.pkl``) from a recorder and serve ``/health``, ``/signals/latest`` and ``/predict``.
 
     Parameters
     ----------
     recorder_id : str
-        mlflow run id of the recorder holding ``model.pkl``.
+        mlflow run id of the recorder holding the model artifact.
     experiment_name : str
         experiment the recorder belongs to.
     source : str

@@ -207,7 +207,7 @@ def test_from_recorder_lazy_imports(monkeypatch, doubles, ticks):
             self.with_dataset = with_dataset
 
         def load_object(self, name):
-            if name == "model.pkl":
+            if name == "params.pkl":
                 return model
             if name == "dataset" and self.with_dataset:
                 return types.SimpleNamespace(handler="offline-handler")
