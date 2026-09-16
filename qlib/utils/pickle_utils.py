@@ -49,13 +49,45 @@ SAFE_PICKLE_CLASSES: Set[Tuple[str, str]] = {
     ("qlib.data.dataset.handler", "DataHandler"),
     ("qlib.data.dataset.handler", "DataHandlerLP"),
     ("qlib.data.dataset.loader", "StaticDataLoader"),
+    # numpy / pandas reconstruction machinery.
+    # These are the concrete classes and reconstruction helpers used when
+    # unpickling ndarrays, Series, DataFrames and their indexes. They only
+    # rebuild data structures; none of them deserialize their arguments, so a
+    # reduce gadget cannot use them to re-enter unrestricted unpickling.
+    # Loader callables such as ``pandas.read_pickle`` or ``numpy.load`` are
+    # deliberately NOT listed here.
+    ("numpy", "ndarray"),
+    ("numpy", "dtype"),
+    # numpy>=2 moved the C-extension module to ``numpy._core``; older releases
+    # expose it as ``numpy.core``. Allow both so pickles remain portable.
+    ("numpy._core.multiarray", "_reconstruct"),
+    ("numpy._core.multiarray", "scalar"),
+    ("numpy.core.multiarray", "_reconstruct"),
+    ("numpy.core.multiarray", "scalar"),
+    ("pandas._libs.arrays", "__pyx_unpickle_NDArrayBacked"),
+    ("pandas._libs.internals", "_unpickle_block"),
+    ("pandas._libs.tslibs.offsets", "Day"),
+    ("pandas.core.arrays.categorical", "Categorical"),
+    ("pandas.core.arrays.datetimes", "DatetimeArray"),
+    ("pandas.core.arrays.masked", "BaseMaskedArray"),
+    ("pandas.core.arrays.integer", "IntegerArray"),
+    ("pandas.core.arrays.floating", "FloatingArray"),
+    ("pandas.core.arrays.boolean", "BooleanArray"),
+    ("pandas.core.dtypes.dtypes", "CategoricalDtype"),
+    ("pandas.core.dtypes.dtypes", "DatetimeTZDtype"),
+    ("pandas.core.frame", "DataFrame"),
+    ("pandas.core.indexes.base", "Index"),
+    ("pandas.core.indexes.base", "_new_Index"),
+    ("pandas.core.indexes.datetimes", "DatetimeIndex"),
+    ("pandas.core.indexes.datetimes", "_new_DatetimeIndex"),
+    ("pandas.core.indexes.multi", "MultiIndex"),
+    ("pandas.core.indexes.range", "RangeIndex"),
+    ("pandas.core.indexes.numeric", "Int64Index"),
+    ("pandas.core.indexes.numeric", "Float64Index"),
+    ("pandas.core.internals.managers", "BlockManager"),
+    ("pandas.core.internals.managers", "SingleBlockManager"),
+    ("pandas.core.series", "Series"),
 }
-
-
-TRUSTED_MODULE_PREFIXES = (
-    "pandas",
-    "numpy",
-)
 
 
 class RestrictedUnpickler(pickle.Unpickler):
@@ -82,10 +114,11 @@ class RestrictedUnpickler(pickle.Unpickler):
         Raises:
             pickle.UnpicklingError: If the class is not in the whitelist
         """
-        if module.startswith(TRUSTED_MODULE_PREFIXES):
-            return super().find_class(module, name)
-
-        # 2. explicit whitelist (qlib internal)
+        # Only symbols on the explicit (module, name) allowlist are permitted.
+        # Trusting whole package trees (e.g. any "pandas.*"/"numpy.*") is unsafe
+        # because those packages export loader callables that themselves
+        # deserialize their input, which a reduce gadget can abuse to re-enable
+        # unrestricted code execution.
         if (module, name) in SAFE_PICKLE_CLASSES:
             return super().find_class(module, name)
 
