@@ -31,6 +31,7 @@ from .file import (
     unpack_archive_with_buffer,
     get_tmp_file_with_buffer,
 )
+from .expr_eval import safe_eval_expression, ExpressionSecurityError  # noqa: F401
 from ..config import C
 from ..log import get_module_logger, set_log_with_config
 

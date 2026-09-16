@@ -29,6 +29,7 @@ from ..utils import (
     register_wrapper,
     get_module_by_module_path,
     parse_field,
+    safe_eval_expression,
     hash_args,
     normalize_cache_fields,
     code_to_fname,
@@ -394,7 +395,7 @@ class ExpressionProvider(abc.ABC):
             if field in self.expression_instance_cache:
                 expression = self.expression_instance_cache[field]
             else:
-                expression = eval(parse_field(field))
+                expression = safe_eval_expression(parse_field(field))
                 self.expression_instance_cache[field] = expression
         except NameError as e:
             get_module_logger("data").exception(
