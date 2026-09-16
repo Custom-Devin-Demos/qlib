@@ -15,6 +15,7 @@ from qlib.log import get_module_logger
 from qlib.model.trainer import task_train
 from qlib.utils import set_log_with_config
 from qlib.utils.data import update_config
+from qlib.utils.mod import add_trusted_module_dir
 
 set_log_with_config(C.logging_config)
 logger = get_module_logger("qrun", logging.INFO)
@@ -40,13 +41,19 @@ def sys_config(config, config_path):
     """
     sys_config = config.get("sys", {})
 
+    # a workflow config run locally may load `.py` modules next to it or from the working directory
+    add_trusted_module_dir(Path(config_path).parent, Path.cwd())
+
     # abspath
     for p in get_path_list(sys_config.get("path", [])):
         sys.path.append(p)
+        add_trusted_module_dir(p)
 
     # relative path to config path
     for p in get_path_list(sys_config.get("rel_path", [])):
-        sys.path.append(str(Path(config_path).parent.resolve().absolute() / p))
+        rel_p = Path(config_path).parent.resolve().absolute() / p
+        sys.path.append(str(rel_p))
+        add_trusted_module_dir(rel_p)
 
 
 def render_template(config_path: str) -> str:
