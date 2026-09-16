@@ -9,7 +9,7 @@ import pytest
 from qlib.stream import ReplayCSVSource, Tick, WebSocketJSONLinesSource
 from qlib.stream.base import StreamSource
 
-from _synthetic import make_ohlcv
+from ._synthetic import make_ohlcv
 
 
 def _collect_push(source: StreamSource, expected: int, timeout: float = 10.0):

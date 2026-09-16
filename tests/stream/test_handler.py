@@ -8,7 +8,7 @@ from qlib.data.dataset.handler import DataHandlerLP
 from qlib.data.dataset.processor import CSZScoreNorm, Fillna, RobustZScoreNorm
 from qlib.stream import FeatureBuffer, StreamDataset, StreamHandler, Tick
 
-from _synthetic import INSTRUMENTS, N_BARS, frame_to_ticks
+from ._synthetic import INSTRUMENTS, N_BARS, frame_to_ticks
 
 FIELDS = ["$close/Ref($close, 1)-1", "Mean($close, 5)/$close", "Std($close, 10)/$close", "$volume/Mean($volume, 5)"]
 NAMES = ["RET1", "MA5", "STD10", "VMA5"]
@@ -41,9 +41,9 @@ def _handler_frame(feat: pd.DataFrame, label: pd.Series) -> pd.DataFrame:
 
 
 @pytest.fixture
-def filled_buffer(ticks):
+def filled_buffer(ohlcv_ticks):
     buf = FeatureBuffer(FIELDS, NAMES, window=WINDOW)
-    buf.extend(ticks)
+    buf.extend(ohlcv_ticks)
     return buf
 
 
