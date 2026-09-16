@@ -70,6 +70,12 @@ rl = [
   "numpy<2.0.0",
 ]
 
+stream = [
+  "websockets",
+  "fastapi",
+  "uvicorn",
+]
+
 lint = [
   "black",
   "pylint",

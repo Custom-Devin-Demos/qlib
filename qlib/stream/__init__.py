@@ -15,4 +15,29 @@ Public API (see ``qlib/stream/README.md`` for the module contract):
 
 from .base import Tick, StreamSource, TickCallback, TICK_FIELDS
 
-__all__ = ["Tick", "StreamSource", "TickCallback", "TICK_FIELDS"]
+# heavier classes are imported lazily so ``import qlib.stream`` stays cheap and works without ``websockets``
+_LAZY = {
+    "ReplayCSVSource": ".sources",
+    "WebSocketJSONLinesSource": ".sources",
+    "FeatureBuffer": ".buffer",
+    "BufferFeature": ".buffer",
+    "StreamHandler": ".handler",
+    "StreamDataset": ".handler",
+}
+
+__all__ = ["Tick", "StreamSource", "TickCallback", "TICK_FIELDS"] + sorted(_LAZY)
+
+
+def __getattr__(name):
+    if name in _LAZY:
+        import importlib  # pylint: disable=C0415
+
+        module = importlib.import_module(_LAZY[name], __name__)
+        value = getattr(module, name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__():
+    return sorted(set(globals()) | set(__all__))
