@@ -34,7 +34,7 @@ def main(
     speed: float = 0.2,
     loop: bool = False,
     handler: str = "Alpha158",
-    window: int = 60,
+    window: int = 61,
     host: str = "0.0.0.0",
     port: int = 8000,
 ):

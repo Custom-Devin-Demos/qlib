@@ -20,7 +20,7 @@ The full module contract lives in [`qlib/stream/README.md`](../../qlib/stream/RE
 | --- | --- |
 | `gen_sample_ticks.py` | Deterministic synthetic daily OHLCV bars (5 instruments x 150 bars, seed 42). |
 | `sample_ticks.csv` | The generated data (committed so the example runs out of the box). |
-| `train_offline.py` | Trains a small `LGBModel` on Alpha158 features computed by `FeatureBuffer`; saves `model.pkl` with `R`. |
+| `train_offline.py` | Trains a small `LGBModel` on Alpha158 features computed by `FeatureBuffer`; saves `params.pkl` with `R`. |
 | `serve_stream.py` | `ReplayCSVSource` + `OnlineInferenceServer.from_recorder(...)` served with uvicorn on `:8000`. |
 | `consume_signals.py` | Polls `GET /signals/latest` into `StreamSignalSink` -> `StreamOnlineStrategy` -> `OnlineManager`. |
 | `workflow_config_online_stream.yaml` | `qrun`-style description of the task (model + Alpha158 handler + `StreamOnlineStrategy`). |
@@ -54,10 +54,10 @@ python train_offline.py                        # ~ a few seconds
 # experiment_name=online_stream recorder_id=6b59dbf69a5f487b81e9a68e3a298525
 ```
 
-`train_offline.py` feeds all ticks through `FeatureBuffer.from_handler_config("Alpha158", window=60)` and calls
+`train_offline.py` feeds all ticks through `FeatureBuffer.from_handler_config("Alpha158", window=61)` and calls
 `.features()`, so the training frame is produced by the *same* code path the server uses online. The label is
 `Ref($close,-2)/Ref($close,-1)-1` computed with pandas. `qlib.init()` is called without a provider: the recorder
-(`model.pkl`, `handler_config`) is written to `./mlruns` by `qlib.workflow.R`.
+(`params.pkl`, `handler_config`) is written to `./mlruns` by `qlib.workflow.R`.
 
 ## 4. Serve
 

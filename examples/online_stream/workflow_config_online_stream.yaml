@@ -21,8 +21,8 @@ stream:
     buffer:
         class: FeatureBuffer
         module_path: qlib.stream.buffer
-        handler_cls: Alpha158   # FeatureBuffer.from_handler_config("Alpha158", window=60)
-        window: 60
+        handler_cls: Alpha158   # FeatureBuffer.from_handler_config("Alpha158", window=61)
+        window: 61
     server:
         class: OnlineInferenceServer
         module_path: qlib.stream.server

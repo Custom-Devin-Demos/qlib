@@ -7,7 +7,7 @@ Train a small ``LGBModel`` on Alpha158 features computed from ``sample_ticks.csv
 
 The feature frame is built by feeding every tick into ``qlib.stream.buffer.FeatureBuffer`` (the very same
 component the inference server uses), so offline training and online scoring see identical features. The label
-``Ref($close,-2)/Ref($close,-1)-1`` is computed with pandas. The model is stored as ``model.pkl`` in a
+``Ref($close,-2)/Ref($close,-1)-1`` is computed with pandas. The model is stored as ``params.pkl`` (same artifact name as ``task_train``) in a
 ``qlib.workflow.R`` recorder; the recorder id is printed at the end and consumed by ``serve_stream.py`` /
 ``python -m qlib.cli.stream serve``.
 """
@@ -45,7 +45,7 @@ def compute_label(ticks: pd.DataFrame) -> pd.Series:
     return label.stack().rename(LABEL_NAME).reorder_levels(["datetime", "instrument"]).sort_index()
 
 
-def build_features(ticks: pd.DataFrame, handler: str = "Alpha158", window: int = 60) -> pd.DataFrame:
+def build_features(ticks: pd.DataFrame, handler: str = "Alpha158", window: int = 61) -> pd.DataFrame:
     """All buffered Alpha158 rows, index ``(datetime, instrument)``, columns == Alpha158 feature names."""
     # Lazy import: qlib.stream.buffer only exists once the full ``qlib.stream`` stack is installed.
     from qlib.stream.base import Tick
@@ -101,7 +101,7 @@ def main(
     ticks: str = str(HERE / "sample_ticks.csv"),
     experiment_name: str = "online_stream",
     handler: str = "Alpha158",
-    window: int = 60,
+    window: int = 61,
     num_boost_round: int = 30,
     train_frac: float = 0.7,
 ) -> str:
@@ -128,7 +128,7 @@ def main(
         pred = model.predict(dataset, segment="valid")
         ic = pred.groupby(level="datetime").apply(lambda s: s.corr(dataset.df["label"][LABEL_NAME].loc[s.index]))
         R.log_metrics(valid_ic_mean=float(ic.mean()))
-        R.save_objects(model=model)
+        R.save_objects(**{"params.pkl": model})
         R.save_objects(
             handler_config={"class": handler, "window": window, "fields": list(dataset.df["feature"].columns)}
         )
