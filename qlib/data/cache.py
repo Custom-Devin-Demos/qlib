@@ -26,6 +26,7 @@ from ..utils import (
     get_redis_connection,
     read_bin,
     parse_field,
+    safe_eval_expression,
     remove_fields_space,
     normalize_cache_fields,
     normalize_cache_instruments,
@@ -540,7 +541,7 @@ class DiskExpressionCache(ExpressionCache):
             field = remove_fields_space(field)
             # cache unavailable, generate the cache
             _instrument_dir.mkdir(parents=True, exist_ok=True)
-            if not isinstance(eval(parse_field(field)), Feature):
+            if not isinstance(safe_eval_expression(parse_field(field)), Feature):
                 # When the expression is not a raw feature
                 # generate expression cache if the feature is not a Feature
                 # instance
